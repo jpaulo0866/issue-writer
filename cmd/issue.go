@@ -77,7 +77,7 @@ var issueCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		fmt.Println("Card criado com sucesso!")
-		fmt.Printf("URL: %s", url)
+		fmt.Println(url)
 	},
 }
 

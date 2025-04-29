@@ -15,7 +15,12 @@ func GenerateDescription(title, milestoneDesc string) (string, error) {
 	if openaiToken == "" {
 		return "", errors.New("OPENAI_API_KEY não configurada")
 	}
-	prompt := "Gere um descritivo detalhado para um card de tarefa com o título: '" + title + "' considerando o contexto: '" + milestoneDesc + "'."
+	prompt := "Gere um descritivo detalhado para um card de tarefa com o título: '" +
+		title +
+		"' considerando o contexto: '" +
+		milestoneDesc + "'." +
+		"\n Não inclua o título na descrição a ser retornada, apenas use como fonte de informação." +
+		"\n Retorne o conteúdo no format markdown."
 	payload := map[string]interface{}{
 		"model": "gpt-3.5-turbo",
 		"messages": []map[string]string{

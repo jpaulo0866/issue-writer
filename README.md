@@ -53,3 +53,11 @@ go build -o issue-writer.exe
 
 - O projeto salva as configurações em ~/.issue_writer_cli_config.json
 - Por enquanto, apenas integração com GitLab.
+
+## Adicionar no path do S.O
+
+Copie o binário gerado na pasta dist para /usr/local/bin
+
+```sh
+sudo cp dist/issue-writer /usr/local/bin
+```
