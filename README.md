@@ -1,6 +1,6 @@
-# GitLab Card CLI
+# Issue Writer CLI
 
-CLI para gerar cards no GitLab com descrição automática via OpenAI.
+CLI para gerar cards com descrição automática via OpenAI.
 
 ## Pré-requisitos
 
