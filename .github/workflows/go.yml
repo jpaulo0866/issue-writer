@@ -5,7 +5,71 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build-and-release:
+  create-release:
+    runs-on: ubuntu-22.04
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      new_tag: ${{ steps.bump_tag.outputs.new_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          git fetch --tags
+          TAG=$(git tag --list 'v*' --sort=-v:refname | head -n 1)
+          if [ -z "$TAG" ]; then
+            TAG="v0.0.0"
+          fi
+          echo "Latest tag: $TAG"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Bump tag
+        id: bump_tag
+        run: |
+          OLD_TAG=${{ steps.get_tag.outputs.tag }}
+          IFS='.' read -r -a parts <<< "${OLD_TAG#v}"
+          PATCH=$((parts[2]+1))
+          NEW_TAG="v${parts[0]}.${parts[1]}.$PATCH"
+          echo "New tag: $NEW_TAG"
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+
+      - name: Create new tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ steps.bump_tag.outputs.new_tag }}
+          git push origin ${{ steps.bump_tag.outputs.new_tag }}
+
+      - name: Get commit messages since last tag
+        id: changelog
+        run: |
+          LAST_TAG=${{ steps.get_tag.outputs.tag }}
+          if [ "$LAST_TAG" = "v0.0.0" ]; then
+            LOG=$(git log --pretty=format:"* %s")
+          else
+            LOG=$(git log $LAST_TAG..HEAD --pretty=format:"* %s")
+          fi
+          echo "log<<EOF" >> $GITHUB_OUTPUT
+          echo "$LOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.bump_tag.outputs.new_tag }}
+          release_name: Release ${{ steps.bump_tag.outputs.new_tag }}
+          body: ${{ steps.changelog.outputs.log }}
+          draft: false
+          prerelease: false
+
+  build-and-upload:
+    needs: create-release
     strategy:
       matrix:
         include:
@@ -28,7 +92,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # necessário para buscar todas as tags
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -43,86 +107,12 @@ jobs:
           mkdir -p dist
           go build -o dist/${{ matrix.artifact }}
 
-      # Only run tag and release creation on one platform to avoid conflicts
-      - name: Get latest tag
-        if: matrix.os == 'ubuntu-22.04'
-        id: get_tag
-        run: |
-          git fetch --tags
-          TAG=$(git tag --list 'v*' --sort=-v:refname | head -n 1)
-          if [ -z "$TAG" ]; then
-            TAG="v0.0.0"
-          fi
-          echo "Latest tag: $TAG"
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-
-      - name: Bump tag
-        if: matrix.os == 'ubuntu-22.04'
-        id: bump_tag
-        run: |
-          OLD_TAG=${{ steps.get_tag.outputs.tag }}
-          IFS='.' read -r -a parts <<< "${OLD_TAG#v}"
-          PATCH=$((parts[2]+1))
-          NEW_TAG="v${parts[0]}.${parts[1]}.$PATCH"
-          echo "New tag: $NEW_TAG"
-          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
-
-      - name: Create new tag
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git tag ${{ steps.bump_tag.outputs.new_tag }}
-          git push origin ${{ steps.bump_tag.outputs.new_tag }}
-
-      - name: Get commit messages since last tag
-        if: matrix.os == 'ubuntu-22.04'
-        id: changelog
-        run: |
-          LAST_TAG=${{ steps.get_tag.outputs.tag }}
-          if [ "$LAST_TAG" = "v0.0.0" ]; then
-            LOG=$(git log --pretty=format:"* %s")
-          else
-            LOG=$(git log $LAST_TAG..HEAD --pretty=format:"* %s")
-          fi
-          echo "log<<EOF" >> $GITHUB_OUTPUT
-          echo "$LOG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
-      - name: Create Release
-        if: matrix.os == 'ubuntu-22.04'
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.bump_tag.outputs.new_tag }}
-          release_name: Release ${{ steps.bump_tag.outputs.new_tag }}
-          body: ${{ steps.changelog.outputs.log }}
-          draft: false
-          prerelease: false
-
-      # Wait for release to be created before uploading assets
-      - name: Sleep for release creation
-        if: matrix.os != 'ubuntu-22.04'
-        shell: bash
-        run: sleep 15
-
-      # Get release upload URL for non-ubuntu runners
-      - name: Get Release
-        if: matrix.os != 'ubuntu-22.04'
-        id: get_release
-        uses: bruceadams/get-release@v1.3.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # Upload assets from all platforms
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ matrix.os == 'ubuntu-22.04' && steps.create_release.outputs.upload_url || steps.get_release.outputs.upload_url }}
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: ./dist/${{ matrix.artifact }}
           asset_name: ${{ matrix.artifact }}
           asset_content_type: application/octet-stream
