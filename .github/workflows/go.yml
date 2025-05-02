@@ -1,0 +1,84 @@
+name: Go Release Auto Tag
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # necessário para buscar todas as tags
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+
+      - name: Build
+        run: go build -o dist/issue-writer.amd64
+
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          git fetch --tags
+          TAG=$(git tag --list 'v*' --sort=-v:refname | head -n 1)
+          if [ -z "$TAG" ]; then
+            TAG="v0.0.0"
+          fi
+          echo "Latest tag: $TAG"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Bump tag
+        id: bump_tag
+        run: |
+          OLD_TAG=${{ steps.get_tag.outputs.tag }}
+          IFS='.' read -r -a parts <<< "${OLD_TAG#v}"
+          PATCH=$((parts[2]+1))
+          NEW_TAG="v${parts[0]}.${parts[1]}.$PATCH"
+          echo "New tag: $NEW_TAG"
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+
+      - name: Create new tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ steps.bump_tag.outputs.new_tag }}
+          git push origin ${{ steps.bump_tag.outputs.new_tag }}
+
+      - name: Get commit messages since last tag
+        id: changelog
+        run: |
+          LAST_TAG=${{ steps.get_tag.outputs.tag }}
+          if [ "$LAST_TAG" = "v0.0.0" ]; then
+            LOG=$(git log --pretty=format:"* %s")
+          else
+            LOG=$(git log $LAST_TAG..HEAD --pretty=format:"* %s")
+          fi
+          echo "log<<EOF" >> $GITHUB_OUTPUT
+          echo "$LOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.bump_tag.outputs.new_tag }}
+          release_name: Release ${{ steps.bump_tag.outputs.new_tag }}
+          body: ${{ steps.changelog.outputs.log }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/issue-writer.amd64
+          asset_name: issue-writer.amd64
+          asset_content_type: application/octet-stream
