@@ -6,7 +6,25 @@ on:
 
 jobs:
   build-and-release:
-    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            artifact: issue-writer.linux-amd64
+            platform: linux-amd64
+            goarch: amd64
+            goos: linux
+          - os: macos-14 # Apple Silicon
+            artifact: issue-writer.darwin-arm64
+            platform: darwin-arm64
+            goarch: arm64
+            goos: darwin
+          - os: macos-latest # Intel x64
+            artifact: issue-writer.darwin-amd64
+            platform: darwin-amd64
+            goarch: amd64
+            goos: darwin
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -18,9 +36,16 @@ jobs:
           go-version: '1.22'
 
       - name: Build
-        run: go build -o dist/issue-writer.amd64
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          mkdir -p dist
+          go build -o dist/${{ matrix.artifact }}
 
+      # Only run tag and release creation on one platform to avoid conflicts
       - name: Get latest tag
+        if: matrix.os == 'ubuntu-22.04'
         id: get_tag
         run: |
           git fetch --tags
@@ -32,6 +57,7 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Bump tag
+        if: matrix.os == 'ubuntu-22.04'
         id: bump_tag
         run: |
           OLD_TAG=${{ steps.get_tag.outputs.tag }}
@@ -42,6 +68,7 @@ jobs:
           echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
 
       - name: Create new tag
+        if: matrix.os == 'ubuntu-22.04'
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
@@ -49,6 +76,7 @@ jobs:
           git push origin ${{ steps.bump_tag.outputs.new_tag }}
 
       - name: Get commit messages since last tag
+        if: matrix.os == 'ubuntu-22.04'
         id: changelog
         run: |
           LAST_TAG=${{ steps.get_tag.outputs.tag }}
@@ -62,6 +90,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Release
+        if: matrix.os == 'ubuntu-22.04'
         id: create_release
         uses: actions/create-release@v1
         env:
@@ -73,12 +102,26 @@ jobs:
           draft: false
           prerelease: false
 
+      # Wait for release to be created before uploading assets
+      - name: Sleep for release creation
+        if: matrix.os != 'ubuntu-22.04'
+        run: sleep 15s
+
+      # Get release upload URL for non-ubuntu runners
+      - name: Get Release
+        if: matrix.os != 'ubuntu-22.04'
+        id: get_release
+        uses: bruceadams/get-release@v1.3.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Upload assets from all platforms
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/issue-writer.amd64
-          asset_name: issue-writer.amd64
+          upload_url: ${{ matrix.os == 'ubuntu-22.04' && steps.create_release.outputs.upload_url || steps.get_release.outputs.upload_url }}
+          asset_path: ./dist/${{ matrix.artifact }}
+          asset_name: ${{ matrix.artifact }}
           asset_content_type: application/octet-stream
