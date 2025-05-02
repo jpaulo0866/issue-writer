@@ -25,7 +25,7 @@ type Epic struct {
 }
 
 func ListGroupMilestone(cfg GitlabConfig, groupID string) ([]Milestone, error) {
-	url := fmt.Sprintf("%s/api/v4/groups/%s/milestones?state=active&include_descendants=true&per_page=100", cfg.BaseURL, groupID)
+	url := fmt.Sprintf("%s/api/v4/groups/%s/milestones?state=active&include_descendants=true&per_page=1000", cfg.BaseURL, groupID)
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("PRIVATE-TOKEN", cfg.Token)
 	client := &http.Client{}
@@ -44,7 +44,7 @@ func ListGroupMilestone(cfg GitlabConfig, groupID string) ([]Milestone, error) {
 }
 
 func ListGroupEpics(cfg GitlabConfig, groupID string) ([]Epic, error) {
-	url := fmt.Sprintf("%s/api/v4/groups/%s/epics?include_descendants=true&per_page=100", cfg.BaseURL, groupID)
+	url := fmt.Sprintf("%s/api/v4/groups/%s/epics?include_descendants=true&per_page=1000", cfg.BaseURL, groupID)
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("PRIVATE-TOKEN", cfg.Token)
 	client := &http.Client{}
