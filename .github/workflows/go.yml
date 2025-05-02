@@ -105,7 +105,8 @@ jobs:
       # Wait for release to be created before uploading assets
       - name: Sleep for release creation
         if: matrix.os != 'ubuntu-22.04'
-        run: sleep 15s
+        shell: bash
+        run: sleep 15
 
       # Get release upload URL for non-ubuntu runners
       - name: Get Release
