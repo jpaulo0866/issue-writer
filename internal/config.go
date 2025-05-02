@@ -16,6 +16,7 @@ type GitlabConfig struct {
 }
 
 type Config struct {
+	Model  string       `json:"model"`
 	Gitlab GitlabConfig `json:"gitlab"`
 	// Futuramente: Github GithubConfig `json:"github"`
 }
@@ -42,5 +43,10 @@ func LoadConfig() (Config, error) {
 	}
 	defer f.Close()
 	err = json.NewDecoder(f).Decode(&cfg)
+
+	if cfg.Model == "" {
+		cfg.Model = "gpt-4-turbo"
+	}
+
 	return cfg, err
 }

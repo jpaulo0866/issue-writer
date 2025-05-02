@@ -16,6 +16,8 @@ var setupCmd = &cobra.Command{
 	Short: "Configura a CLI",
 	Run: func(cmd *cobra.Command, args []string) {
 		reader := bufio.NewReader(os.Stdin)
+		fmt.Print("Modelo da OpenAI: ")
+		model, _ := reader.ReadString('\n')
 		fmt.Print("URL base do GitLab: ")
 		baseURL, _ := reader.ReadString('\n')
 		fmt.Print("Personal Access Token: ")
@@ -28,6 +30,7 @@ var setupCmd = &cobra.Command{
 		groupID, _ := reader.ReadString('\n')
 
 		cfg := internal.Config{
+			Model: model,
 			Gitlab: internal.GitlabConfig{
 				BaseURL:   strings.TrimSpace(baseURL),
 				Token:     strings.TrimSpace(token),

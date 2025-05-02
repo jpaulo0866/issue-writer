@@ -10,12 +10,13 @@ import (
 )
 
 var (
-	titulo    string
-	epico     string
-	milestone string
-	labels    string
-	userID    string
-	projectID string
+	titulo      string
+	epico       string
+	milestone   string
+	labels      string
+	userID      string
+	projectID   string
+	complemento string
 )
 
 var issueCmd = &cobra.Command{
@@ -57,7 +58,7 @@ var issueCmd = &cobra.Command{
 		}
 
 		// Gera descrição via OpenAI
-		description, err := internal.GenerateDescription(titulo, milestoneInfo.Description)
+		description, err := internal.GenerateDescription(titulo, milestoneInfo.Description, complemento)
 		if err != nil {
 			fmt.Println("Erro ao gerar descrição:", err)
 			os.Exit(1)
@@ -81,6 +82,57 @@ var issueCmd = &cobra.Command{
 	},
 }
 
+var milestoneCmd = &cobra.Command{
+	Use:   "list-milestones",
+	Short: "Lista as milestones do projeto configurado",
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg, err := internal.LoadConfig()
+		if err != nil {
+			fmt.Println("Erro ao carregar configuração:", err)
+			os.Exit(1)
+		}
+		gitlabCfg := cfg.Gitlab
+		milestones, err := internal.ListGroupMilestone(gitlabCfg, gitlabCfg.GroupID)
+		if err != nil {
+			fmt.Println("Erro ao buscar milestones:", err)
+			os.Exit(1)
+		}
+
+		fmt.Println("Milestones encontradas:")
+		for _, milestone := range milestones {
+			fmt.Println(" - ", milestone.Title)
+		}
+	},
+}
+
+var epicsCmd = &cobra.Command{
+	Use:   "list-epics",
+	Short: "Lista os épicos do projeto configurado",
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg, err := internal.LoadConfig()
+		if err != nil {
+			fmt.Println("Erro ao carregar configuração:", err)
+			os.Exit(1)
+		}
+		gitlabCfg := cfg.Gitlab
+		epics, err := internal.ListGroupEpics(gitlabCfg, gitlabCfg.GroupID)
+		if err != nil {
+			fmt.Println("Erro ao buscar epicos:", err)
+			os.Exit(1)
+		}
+
+		fmt.Println("Epicos encontrados:")
+		for _, epic := range epics {
+			fmt.Println(" - ", epic.Title)
+		}
+	},
+}
+
+var gitlabRootCmd = &cobra.Command{
+	Use:   "gitlab",
+	Short: "Operações no GITLAB",
+}
+
 func init() {
 	issueCmd.Flags().StringVarP(&titulo, "titulo", "t", "", "Título do card")
 	issueCmd.Flags().StringVarP(&epico, "epico", "e", "", "Epico")
@@ -88,7 +140,12 @@ func init() {
 	issueCmd.Flags().StringVarP(&labels, "labels", "l", "", "Lista de labels separadas por vírgula")
 	issueCmd.Flags().StringVarP(&userID, "user", "u", "", "ID do usuário (opcional)")
 	issueCmd.Flags().StringVarP(&projectID, "project", "p", "", "ID do projeto (opcional)")
+	issueCmd.Flags().StringVarP(&complemento, "complemento", "c", "", "Complemento de prompt (opcional)")
 	issueCmd.MarkFlagRequired("titulo")
 	issueCmd.MarkFlagRequired("epico")
 	issueCmd.MarkFlagRequired("milestone")
+
+	gitlabRootCmd.AddCommand(issueCmd)
+	gitlabRootCmd.AddCommand(epicsCmd)
+	gitlabRootCmd.AddCommand(milestoneCmd)
 }

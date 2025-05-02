@@ -18,5 +18,5 @@ func Execute() {
 
 func init() {
 	rootCmd.AddCommand(setupCmd)
-	rootCmd.AddCommand(issueCmd)
+	rootCmd.AddCommand(gitlabRootCmd)
 }

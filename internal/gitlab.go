@@ -24,6 +24,46 @@ type Epic struct {
 	Description string `json:"description"`
 }
 
+func ListGroupMilestone(cfg GitlabConfig, groupID string) ([]Milestone, error) {
+	url := fmt.Sprintf("%s/api/v4/groups/%s/milestones?state=active&include_descendants=true&per_page=100", cfg.BaseURL, groupID)
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("PRIVATE-TOKEN", cfg.Token)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	var milestones []Milestone
+	if err != nil {
+		return milestones, err
+	}
+	defer resp.Body.Close()
+
+	if err := json.NewDecoder(resp.Body).Decode(&milestones); err != nil {
+		return milestones, err
+	}
+
+	return milestones, nil
+}
+
+func ListGroupEpics(cfg GitlabConfig, groupID string) ([]Epic, error) {
+	url := fmt.Sprintf("%s/api/v4/groups/%s/epics?include_descendants=true&per_page=100", cfg.BaseURL, groupID)
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("PRIVATE-TOKEN", cfg.Token)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	var epics []Epic
+	if err != nil {
+		return epics, err
+	}
+	defer resp.Body.Close()
+
+	fmt.Printf("Status Code %d", resp.StatusCode)
+
+	if err := json.NewDecoder(resp.Body).Decode(&epics); err != nil {
+		return epics, err
+	}
+
+	return epics, nil
+}
+
 func GetGroupMilestone(cfg GitlabConfig, groupID, milestoneTitle string) (Milestone, error) {
 	// encode the milestoneTitle
 	encodedMilestoneTitle := url.QueryEscape(milestoneTitle)
@@ -90,7 +130,7 @@ func GetClosestIteration(cfg Config, projectID string) (int, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 500 {
-		return 0, errors.New("Falha ao buscar no gitlab")
+		return 0, errors.New("falha ao buscar no gitlab")
 	}
 	var iterations []struct {
 		ID        int       `json:"id"`

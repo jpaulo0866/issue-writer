@@ -11,18 +11,31 @@ import (
 
 var openaiToken = os.Getenv("OPENAI_API_KEY")
 
-func GenerateDescription(title, milestoneDesc string) (string, error) {
+func GenerateDescription(title, milestoneDesc, complemento string) (string, error) {
 	if openaiToken == "" {
 		return "", errors.New("OPENAI_API_KEY não configurada")
 	}
-	prompt := "Gere um descritivo detalhado para um card de tarefa com o título: '" +
+
+	cfg, err := LoadConfig()
+	if err != nil {
+		return "", err
+	}
+
+	// validate if complemento is not null or empty
+	if complemento != "" {
+		complemento = "\n Considere também esse complemento de contexto: " + complemento
+	}
+
+	prompt := "Você é um analista de sistemas e seu objetivo é criar descritivos para tarefas para times de tecnologia. " +
+		" \n Gere um descritivo detalhado para um card de tarefa com o título: '" +
 		title +
 		"' considerando o contexto: '" +
 		milestoneDesc + "'." +
+		complemento +
 		"\n Não inclua o título na descrição a ser retornada, apenas use como fonte de informação." +
 		"\n Retorne o conteúdo no format markdown."
 	payload := map[string]interface{}{
-		"model": "gpt-3.5-turbo",
+		"model": cfg.Model,
 		"messages": []map[string]string{
 			{"role": "user", "content": prompt},
 		},

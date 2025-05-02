@@ -30,20 +30,30 @@ go build -o issue-writer.exe
 
 **Parâmetros:**
 
+- Modelo da OPENAI para uso ( Se deixar em branco vai ser usado o gpt-4-turbo )
 - URL base do GitLab ( Sem barra no final )
 - Personal Access Token
 - ID do usuário do GitLab ( {URL_GIT}/-/user_settings/profile - Campo User ID )
 - ID do projeto (opcional - Projeto onde a Issue será registrada )
 - ID do grupo do GitLab ( Id do grupo onde reside a Milestone e o épico - Funciona a hierarquia de cima para baixo, logo o grupo mais alto enxerga os épicos e milestones dos grupos abaixo )
 
+### Listar épicos:
+
+`issue-writer gitlab list-epics`
+
+### Listar Milestones:
+
+`issue-writer gitlab list-milestones`
+
 ### Gerar card:
 
-`./issue-writer new-issue --titulo "Título do Card" --epico "Epico" --milestone "Milestone" --labels "bug,backend"`
+`./issue-writer gitlab new-issue --titulo "Título do Card" --epico "Epico" --milestone "Milestone" --labels "bug,backend"`
 
 **Parâmetros opcionais:**
 
 - --user
 - --project
+- --complemento "Descrição adicional para o card"
 
 ### Variáveis de ambiente
 
